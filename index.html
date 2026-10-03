@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalmPlan - Deadline Planner for Engineering Students</title>
+<style>
+  /* ---------- Calm palette (soft blue + green) ---------- */
+  :root{
+    --bg:#eef5f6; --card:#ffffff; --ink:#1f3a44; --muted:#5d7780;
+    --blue:#4f8fb8; --blue-d:#2f6f94; --blue-l:#e2eff7;
+    --green:#6fb38f; --green-d:#3f8a63; --green-l:#e3f2ea;
+    --red-l:#fbe4e1; --red:#a14a42; --line:#d6e4e8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Nunito","Segoe UI",system-ui,-apple-system,sans-serif;
+    font-size:18px;line-height:1.5}
+  .wrap{max-width:1040px;margin:0 auto;padding:20px 16px 48px}
+  header{padding:12px 4px 20px}
+  h1{margin:0;font-size:2rem;color:var(--blue-d);letter-spacing:-.01em}
+  header p{margin:4px 0 0;color:var(--muted)}
+  h2{margin:0 0 12px;font-size:1.25rem}
+  .grid{display:grid;gap:18px}
+  @media(min-width:900px){.grid{grid-template-columns:360px 1fr;align-items:start}}
+  .card{background:var(--card);border-radius:22px;padding:20px;
+    box-shadow:0 2px 14px rgba(47,111,148,.09);margin-bottom:18px}
+  label{display:block;font-weight:700;margin:12px 0 4px;font-size:.95rem}
+  input,select,button{font:inherit}
+  input[type=text],input[type=date],input[type=number],select{
+    width:100%;padding:11px 12px;border:2px solid var(--line);border-radius:14px;
+    background:#fff;color:var(--ink)}
+  input:focus,select:focus,button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{background:var(--blue-d);color:#fff;border:0;border-radius:14px;
+    padding:12px 18px;font-weight:700;cursor:pointer;width:100%;margin-top:16px}
+  .btn:hover{background:var(--blue)}
+  .btn.soft{background:var(--green-l);color:var(--green-d);width:auto;margin-top:12px}
+  .btn.soft:hover{background:#d3ebdf}
+  .err{color:var(--red);font-size:.9rem;min-height:1.3em;margin:6px 0 0}
+
+  /* ---------- Stress check-in ---------- */
+  input[type=range]{width:100%;accent-color:var(--green-d);margin:8px 0 2px}
+  .scale{display:flex;justify-content:space-between;color:var(--muted);font-size:.85rem}
+  .msg{margin-top:12px;padding:14px;border-radius:16px;background:var(--green-l)}
+  .msg.high{background:var(--blue-l)}
+  .small{font-size:.88rem;color:var(--muted);margin:12px 0 0}
+  .orbbox{text-align:center;margin-top:14px}
+  .orb{width:130px;height:130px;margin:10px auto;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#bfe3d0,var(--blue));
+    transform:scale(.7)}
+  .orb.run{animation:breathe 8s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(.6)}50%{transform:scale(1.05)}}
+  @media(prefers-reduced-motion:reduce){.orb.run{animation:none;transform:scale(.85)}}
+  .orbText{font-weight:800;font-size:1.2rem;color:var(--blue-d)}
+
+  /* ---------- Tasks ---------- */
+  .progress{height:14px;background:var(--line);border-radius:99px;overflow:hidden;margin:8px 0 4px}
+  .bar{height:100%;width:0;background:var(--green);border-radius:99px;transition:width .4s}
+  .start{background:linear-gradient(135deg,var(--blue-l),var(--green-l));border:2px solid #cfe5dc}
+  .task{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:16px;
+    background:#fff;border:2px solid var(--line);margin-top:10px}
+  .start .task{border-color:#bfdcd0}
+  .task.overdue{background:var(--red-l);border-color:#f0c3be}
+  .task.done{opacity:.6}
+  .task.done .name{text-decoration:line-through}
+  .check{width:30px;height:30px;flex:none;border-radius:50%;border:2px solid var(--green);
+    background:#fff;color:#fff;cursor:pointer;font-size:1rem;line-height:1}
+  .done .check{background:var(--green)}
+  .body{flex:1;min-width:0}
+  .name{font-weight:800;overflow-wrap:anywhere}
+  .reason{color:var(--muted);font-size:.92rem}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .tag{font-size:.8rem;padding:2px 10px;border-radius:99px;background:var(--blue-l);color:var(--blue-d)}
+  .tag.quick{background:var(--green-l);color:var(--green-d)}
+  .tag.deep{background:#e7e4f5;color:#4d4690}
+  .del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:1.3rem;padding:0 4px}
+  .del:hover{color:var(--red)}
+  .empty{color:var(--muted);padding:8px 0}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--green-d);
+    color:#fff;padding:12px 20px;border-radius:99px;max-width:90vw;opacity:0;
+    pointer-events:none;transition:opacity .3s}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CalmPlan</h1>
+    <p>Plan your deadlines without the panic. One calm step at a time.</p>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: add task + stress check-in -->
+    <div>
+      <section class="card">
+        <h2>Add a task</h2>
+        <div id="form">
+          <label for="name">Task name</label>
+          <input type="text" id="name" maxlength="80" placeholder="e.g. Data Structures assignment">
+          <div class="row">
+            <div><label for="date">Deadline</label><input type="date" id="date"></div>
+            <div><label for="hours">Effort (hours)</label><input type="number" id="hours" min="0.25" step="0.25" value="2"></div>
+          </div>
+          <label for="cat">Category</label>
+          <select id="cat">
+            <option value="core">Core to my branch</option>
+            <option value="other">Other subject</option>
+            <option value="extra">Extra / optional</option>
+          </select>
+          <p class="err" id="err" role="alert"></p>
+          <button class="btn" type="button" id="addBtn">Add task</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>How are you feeling?</h2>
+        <label for="stress">How stressed do you feel right now?</label>
+        <input type="range" id="stress" min="1" max="5" value="3">
+        <div class="scale"><span>1 Calm</span><span>5 Very stressed</span></div>
+        <div class="msg" id="stressMsg"></div>
+        <div class="orbbox" id="breathBox" hidden>
+          <div class="orb" id="orb"></div>
+          <div class="orbText" id="orbText">Ready when you are</div>
+          <button class="btn soft" id="breathBtn" type="button">Start 1-minute breathing</button>
+        </div>
+        <p class="small">If stress feels too heavy, talk to a friend, family member or your college counsellor.</p>
+      </section>
+    </div>
+
+    <!-- RIGHT: progress, start here, all tasks -->
+    <div>
+      <section class="card">
+        <h2>Your progress</h2>
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <div class="reason" id="progText">No tasks yet.</div>
+      </section>
+
+      <section class="card start">
+        <h2>Start here</h2>
+        <div id="startList"></div>
+      </section>
+
+      <section class="card">
+        <h2>Everything else</h2>
+        <div id="restList"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- Storage ---------- */
+const KEY = 'calmplan.v1';
+let state = { tasks: [], stress: 3 };
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY));
+  if (saved && Array.isArray(saved.tasks)) state = Object.assign(state, saved);
+} catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function todayStr() {
+  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+function daysLeft(dl) {
+  return Math.round((new Date(dl + 'T00:00:00') - new Date(todayStr() + 'T00:00:00')) / 86400000);
+}
+const CATS = {
+  core:  { name: 'Core subject',     w: 1.5 },
+  other: { name: 'Other subject',    w: 1 },
+  extra: { name: 'Extra / optional', w: 0.5 }
+};
+// Label by effort: Quick win / Medium / Deep work
+function effortLabel(h) {
+  if (h < 1) return { text: 'Quick win', cls: 'quick' };
+  if (h <= 3) return { text: 'Medium', cls: '' };
+  return { text: 'Deep work', cls: 'deep' };
+}
+function dueText(d) {
+  if (d < 0) return 'overdue by ' + (-d) + (d === -1 ? ' day' : ' days');
+  if (d === 0) return 'due today';
+  if (d === 1) return 'due tomorrow';
+  return 'due in ' + d + ' days';
+}
+// Priority score: closer deadline + more important category + effort fit
+function score(t) {
+  const d = daysLeft(t.deadline);
+  const urgency = d < 0 ? 12 : 10 / (1 + d * 0.5);
+  let s = urgency * CATS[t.cat].w;
+  if (t.hours < 1) s += 1.5;                    // quick wins get a small boost
+  else if (t.hours <= 3) s += 0.5;
+  if (t.hours / (d + 1) > 3 && d >= 0) s += 2;  // big task, little time left
+  return s;
+}
+
+/* ---------- Render tasks ---------- */
+function taskHTML(t) {
+  const d = daysLeft(t.deadline), l = effortLabel(t.hours);
+  const overdue = !t.done && d < 0;
+  return `<div class="task ${overdue ? 'overdue' : ''} ${t.done ? 'done' : ''}">
+    <button class="check" data-act="done" data-id="${t.id}" aria-label="Mark done">${t.done ? '&#10003;' : ''}</button>
+    <div class="body">
+      <div class="name">${esc(t.name)}</div>
+      <div class="reason">${CATS[t.cat].name}, ${dueText(d)}</div>
+      <div class="tags"><span class="tag ${l.cls}">${l.text}</span><span class="tag">${t.hours} h</span></div>
+    </div>
+    <button class="del" data-act="del" data-id="${t.id}" aria-label="Delete task">&times;</button>
+  </div>`;
+}
+function render() {
+  const active = state.tasks.filter(t => !t.done).sort((a, b) => score(b) - score(a));
+  const done = state.tasks.filter(t => t.done);
+  $('startList').innerHTML = active.length
+    ? active.slice(0, 3).map(taskHTML).join('')
+    : '<div class="empty">Nothing to start yet. Add a task and I will pick your first steps.</div>';
+  const rest = active.slice(3).concat(done);
+  $('restList').innerHTML = rest.length ? rest.map(taskHTML).join('')
+    : '<div class="empty">Nothing else on your plate.</div>';
+  const total = state.tasks.length, n = done.length;
+  $('bar').style.width = total ? (n / total * 100) + '%' : '0';
+  $('progText').textContent = total ? n + ' of ' + total + ' done' + (n === total ? '. All clear, well done!' : '') : 'No tasks yet.';
+  renderStress();
+}
+
+/* ---------- Stress check-in ---------- */
+const CALM = ['You are in a good place. Keep this steady pace.',
+  'Nice and steady. Small steps are enough today.',
+  'A little pressure is normal. Stick to the Start here list.'];
+function renderStress() {
+  const v = Number(state.stress);
+  $('stress').value = v;
+  const box = $('stressMsg'), breath = $('breathBox');
+  if (v >= 4) {
+    const top = state.tasks.filter(t => !t.done).sort((a, b) => score(b) - score(a))[0];
+    const step = top
+      ? 'Your tiny first step: spend just 10 minutes on "' + esc(top.name) + '". Open it and write down the very first thing to do.'
+      : 'Add one task, and I will suggest a tiny 10-minute first step.';
+    box.className = 'msg high';
+    box.innerHTML = '<strong>Pause. You are okay.</strong> Stress shrinks your thinking. Breathe first, then do one small thing. <br><br>' + step;
+    breath.hidden = false;
+  } else {
+    box.className = 'msg';
+    box.textContent = v === 1 ? CALM[0] : v === 2 ? CALM[0] : CALM[v === 3 ? 2 : 1];
+    breath.hidden = true; stopBreath();
+  }
+}
+$('stress').addEventListener('input', e => { state.stress = Number(e.target.value); save(); renderStress(); });
+
+/* ---------- 1-minute breathing (4s in, 4s out) ---------- */
+let timer = null;
+function stopBreath(reset = true) {
+  clearInterval(timer); timer = null;
+  $('orb').classList.remove('run');
+  $('breathBtn').textContent = 'Start 1-minute breathing';
+  if (reset) $('orbText').textContent = 'Ready when you are';
+}
+function startBreath() {
+  let elapsed = 0;
+  $('orb').classList.remove('run'); void $('orb').offsetWidth; $('orb').classList.add('run');
+  $('breathBtn').textContent = 'Stop';
+  $('orbText').textContent = 'Breathe in';
+  timer = setInterval(() => {
+    elapsed++;
+    if (elapsed >= 60) { stopBreath(false); $('orbText').textContent = 'Well done. Notice how you feel now.'; return; }
+    $('orbText').textContent = Math.floor(elapsed / 4) % 2 === 0 ? 'Breathe in' : 'Breathe out';
+  }, 1000);
+}
+$('breathBtn').addEventListener('click', () => timer ? stopBreath() : startBreath());
+
+/* ---------- Add / done / delete ---------- */
+$('date').value = todayStr();
+function addTask() {
+  const name = $('name').value.trim(), date = $('date').value, hours = parseFloat($('hours').value);
+  if (!name) return $('err').textContent = 'Please type a task name.';
+  if (!date) return $('err').textContent = 'Please pick a deadline.';
+  if (!(hours > 0)) return $('err').textContent = 'Effort must be more than 0 hours.';
+  $('err').textContent = '';
+  state.tasks.push({ id: Date.now() + Math.random().toString(16).slice(2), name, deadline: date, hours, cat: $('cat').value, done: false });
+  save(); render();
+  $('name').value = ''; $('name').focus();
+}
+$('addBtn').addEventListener('click', addTask);
+$('form').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') addTask(); });
+const PRAISE = ['Well done! One less thing on your mind.', 'Nice work. Take a deep breath, you earned it.',
+  'Done! Small wins add up.', 'Great job. You are doing better than you think.'];
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const t = state.tasks.find(x => x.id === b.dataset.id); if (!t) return;
+  if (b.dataset.act === 'done') {
+    t.done = !t.done;
+    if (t.done) toast(PRAISE[Math.floor(Math.random() * PRAISE.length)]);
+  } else {
+    state.tasks = state.tasks.filter(x => x.id !== t.id);
+  }
+  save(); render();
+});
+
+render();
+</script>
+</body>
+</html>
